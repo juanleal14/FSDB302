@@ -1,0 +1,230 @@
+
+DROP TABLE Purchases;
+DROP TABLE Comments;
+DROP TABLE Vouchers;
+DROP TABLE Credit_Cards;
+DROP TABLE Addresses;
+DROP TABLE Deliveries;
+DROP TABLE Clients_Non_Registered;
+DROP TABLE Clients_Registered;
+DROP TABLE Providers_offers;
+DROP TABLE Providers;
+DROP TABLE Replacement_orders;
+DROP TABLE References;
+DROP TABLE Formats;
+DROP TABLE Products; 
+
+CREATE TABLE Products(
+	name VARCHAR2(50),
+	coffea VARCHAR2(50),
+	varietal VARCHAR2(50),
+	origin VARCHAR2(50),
+	roasting VARCHAR2(50),
+	decaf CHAR(1),
+	CONSTRAINT pk_product PRIMARY KEY(name)
+);
+
+CREATE TABLE Formats(
+	product_name VARCHAR2(50),
+	type VARCHAR2(50),
+	CONSTRAINT pk_format PRIMARY KEY(product_name, type),
+	CONSTRAINT fk_format_product FOREIGN KEY (product_name)
+		REFERENCES Products(name)
+		ON DELETE CASCADE
+);
+
+CREATE TABLE References(
+	format_name VARCHAR2(50) NOT NULL,
+	format_type VARCHAR2(50) NOT NULL,
+	weight NUMBER(4),
+	volume NUMBER(4),
+	bar_code VARCHAR2(20) NOT NULL,
+	price NUMBER(5,2) NOT NULL,
+	stock NUMBER(4) NOT NULL,
+	minimum NUMBER(4) NOT NULL,
+	maximum NUMBER(4) NOT NULL,
+	CONSTRAINT pk_reference PRIMARY KEY(bar_code),
+	CONSTRAINT fk_reference_format FOREIGN KEY (format_name, format_type)
+		REFERENCES Formats (product_name, type)
+		ON DELETE CASCADE,
+	CONSTRAINT chk_weight_or_volume CHECK (
+		NOT(weight IS NULL AND volume IS NULL))
+);
+
+CREATE TABLE Replacement_orders(
+	state CHAR(1) NOT NULL,
+	units NUMBER(3) NOT NULL,
+	order_date DATE NOT NULL,
+	provider VARCHAR2(20),
+	recieve_date DATE NOT NULL,
+	payment NUMBER(5,2) NOT NULL,
+	reference_bar_code VARCHAR2(20) NOT NULL,
+	order_id NUMBER(8) NOT NULL,
+	CONSTRAINT pk_replacement_order PRIMARY KEY (order_id),
+	CONSTRAINT fk_replacement_order_reference FOREIGN KEY (reference_bar_code)
+		REFERENCES References(bar_code)--action on delete?
+);
+
+CREATE TABLE Providers(
+	total_orders NUMBER(3),
+	speed NUMBER(4,2),
+	name VARCHAR2(50),
+	CIF VARCHAR2(50),
+	salesperson_name VARCHAR2(50),
+	email VARCHAR2(50),
+	phone NUMBER(9),
+	address VARCHAR2(50),
+	CONSTRAINT pk_provider PRIMARY KEY (name),
+	CONSTRAINT ak_provider_CIF UNIQUE (CIF),
+	CONSTRAINT ak_provider_salesperson_name UNIQUE (salesperson_name),
+	CONSTRAINT ak_provider_email UNIQUE (email),
+	CONSTRAINT ak_provider_phone UNIQUE (phone),
+	CONSTRAINT ak_provider_address UNIQUE (address)
+);
+
+CREATE TABLE Providers_offers(
+	provider_name VARCHAR2(50),
+	replacement_order_id NUMBER(8),
+	cost NUMBER(5,2),
+	CONSTRAINT pk_provider_offer PRIMARY KEY (provider_name, replacement_order_id),
+	CONSTRAINT fk_provider_offer_provider FOREIGN KEY (provider_name)
+		REFERENCES Providers(name),
+	CONSTRAINT fk_provider_offer_order FOREIGN KEY (replacement_order_id)
+		REFERENCES Replacement_orders(order_id),
+	CONSTRAINT check_cost CHECK (cost > 0)
+);
+
+CREATE TABLE Clients_Registered(--credit_card,address,voucher,comment
+	username VARCHAR2(50) NOT NULL,
+	password VARCHAR2(50) NOT NULL,
+	register_time VARCHAR2(50) NOT NULL,
+	register_date DATE NOT NULL,
+	name VARCHAR2(50) NOT NULL,
+	surname1 VARCHAR2(50) NOT NULL,
+	surname2 VARCHAR2(50) NOT NULL,
+	email VARCHAR2(50),
+	phone NUMBER(9),
+	contact_preference VARCHAR2(50) DEFAULT 'sms'  NOT NULL,
+	CONSTRAINT pk_client_registered PRIMARY KEY (username,password)
+);
+
+CREATE TABLE Clients_Non_Registered(
+	email VARCHAR2(50) NOT NULL,
+	phone NUMBER(9) NOT NULL,
+	name VARCHAR2(50) NOT NULL,
+	surname1 VARCHAR2(50) NOT NULL,
+	surname2 VARCHAR2(50),
+	shipping_address VARCHAR2(50) NOT NULL,
+	billing_address VARCHAR2(50) NOT NULL,
+	payment_data VARCHAR2(50) NOT NULL,
+	credit_card_number NUMBER(20),
+	CONSTRAINT pk_client_non_reg PRIMARY KEY(email,phone)
+);
+
+CREATE TABLE Deliveries(
+	address VARCHAR2(50),
+	delivery_date DATE,
+	client_reg_username VARCHAR2(50),
+	client_reg_password VARCHAR2(50),
+	client_non_reg_email VARCHAR2(50),
+	client_non_reg_phone NUMBER(9),
+	CONSTRAINT pk_delivery PRIMARY KEY (address,delivery_date),
+	CONSTRAINT fk_delivery_client_reg FOREIGN KEY(client_reg_username,client_reg_password)
+		REFERENCES Clients_Registered(username,password),
+	CONSTRAINT fk_delivery_client_non_reg FOREIGN KEY(client_non_reg_email,client_non_reg_phone)
+		REFERENCES Clients_Non_Registered(email,phone)
+);
+
+CREATE TABLE Addresses(--Primary key?
+	type VARCHAR2(50) NOT NULL,
+	name VARCHAR2(50) NOT NULL,
+	gate NUMBER(2),
+	block NUMBER(2),
+	stairs VARCHAR2(50),
+	floor NUMBER(2) NULL,
+	door VARCHAR2(50) NOT NULL,
+	ZIP NUMBER(5) NOT NULL,
+	town VARCHAR2(50) NOT NULL,
+	city VARCHAR2(50) NOT NULL,
+	country VARCHAR2(50) NOT NULL,
+	client_reg_username VARCHAR2(50) NOT NULL,
+	client_reg_password VARCHAR2(50) NOT NULL,
+	client_non_reg_email VARCHAR2(50) NOT NULL,
+	client_non_reg_phone NUMBER(9) NOT NULL,
+	CONSTRAINT fk_address_client_reg FOREIGN KEY(client_reg_username,client_reg_password)
+		REFERENCES Clients_Registered(username,password),
+	CONSTRAINT fk_address_client_non_reg FOREIGN KEY(client_non_reg_email,client_non_reg_phone)
+		REFERENCES Clients_Non_Registered(email,phone)
+);
+
+CREATE TABLE Credit_Cards(
+	holder VARCHAR2(50),
+	company VARCHAR2(50),
+	card_number NUMBER(20),
+	expiration_date DATE,
+	client_reg_username VARCHAR2(50),
+	client_reg_password VARCHAR2(50),
+	client_non_reg_email VARCHAR2(50),
+	client_non_reg_phone NUMBER(9),
+	CONSTRAINT pk_credit_card PRIMARY KEY (card_number),
+	CONSTRAINT fk_credit_card_client_reg FOREIGN KEY(client_reg_username,client_reg_password)
+		REFERENCES Clients_Registered(username,password),
+	CONSTRAINT fk_credit_card_client_non_reg FOREIGN KEY(client_non_reg_email,client_non_reg_phone)
+		REFERENCES Clients_Non_Registered(email,phone)
+);
+
+CREATE TABLE Vouchers(
+	percentage Number(2),--contentpref?
+	owner VARCHAR2(50),
+	validity_date DATE,
+	client_reg_username VARCHAR2(50),
+	client_reg_password VARCHAR2(50),
+	client_non_reg_email VARCHAR2(50),
+	client_non_reg_phone NUMBER(9),
+	CONSTRAINT pk_voucher PRIMARY KEY (owner,validity_date),
+	CONSTRAINT fk_voucher_client_reg FOREIGN KEY(client_reg_username,client_reg_password)
+		REFERENCES Clients_Registered(username,password),
+	CONSTRAINT fk_voucher_client_non_reg FOREIGN KEY(client_non_reg_email,client_non_reg_phone)
+		REFERENCES Clients_Non_Registered(email,phone)
+);
+
+CREATE TABLE Comments(
+	format VARCHAR2(50),
+	score NUMBER(1) NOT NULL,
+	text VARCHAR2(200) NOT NULL,
+	likes NUMBER(5) NOT NULL,
+	endorsement VARCHAR2(50),
+	ID VARCHAR2(50) NOT NULL,
+	owner VARCHAR2(50),
+	client_reg_username VARCHAR2(50) NOT NULL,
+	client_reg_password VARCHAR2(50) NOT NULL,
+	client_non_reg_email VARCHAR2(50) NOT NULL,
+	client_non_reg_phone NUMBER(9) NOT NULL,
+	CONSTRAINT pk_comment PRIMARY KEY(ID)
+);
+
+
+CREATE TABLE Purchases(--añadir client/referencia
+	order_date DATE NOT NULL,
+	delivery_address VARCHAR2(50) NOT NULL,
+	pay_type VARCHAR2(50) NOT NULL,-- ver si se puede cambiar a char
+	pay_date DATE NOT NULL,
+	credit_card_data VARCHAR2(50),
+	reference_bar_code VARCHAR2(20) NOT NULL,
+	units NUMBER(4) NOT NULL,
+	retail_price NUMBER(5,2) NOT NULL,
+	total_payment NUMBER(5,2) NOT NULL,
+	client_reg_username VARCHAR2(50) NOT NULL,
+	client_reg_password VARCHAR2(50) NOT NULL,
+	client_non_reg_email VARCHAR2(50) NOT NULL,
+	client_non_reg_phone NUMBER(9) NOT NULL,
+	CONSTRAINT pk_purchase PRIMARY KEY (order_date, delivery_address, reference_bar_code),
+	CONSTRAINT fk_purchase_reference FOREIGN KEY (reference_bar_code)
+		REFERENCES References(bar_code),
+	CONSTRAINT fk_purchase_delivery FOREIGN KEY (delivery_address,order_date)
+		REFERENCES Deliveries(address,delivery_date),
+	CONSTRAINT fk_purchase_client_reg FOREIGN KEY(client_reg_username,client_reg_password)
+		REFERENCES Clients_Registered(username,password),
+	CONSTRAINT fk_purchase_client_non_reg FOREIGN KEY(client_non_reg_email,client_non_reg_phone)
+		REFERENCES Clients_Non_Registered(email,phone)
+);
